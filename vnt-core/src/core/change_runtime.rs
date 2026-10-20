@@ -675,6 +675,7 @@ fn instance_rebuild_fields_differ(current: &Config, target: &Config) -> bool {
         || current.port_mapping != target.port_mapping
         || current.subnet_mapping != target.subnet_mapping
         || current.output != target.output
+        || current.bandwidth_mode != target.bandwidth_mode
         || current.event_script != target.event_script
 }
 

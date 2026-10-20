@@ -80,6 +80,7 @@ pub fn merge_present_config(
     overlay!("port_mapping", port_mapping);
     overlay!("subnet_mapping", subnet_mapping);
     overlay!("output", output);
+    overlay!("bandwidth_mode", bandwidth_mode);
     local
 }
 

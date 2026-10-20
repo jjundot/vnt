@@ -13,10 +13,7 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
-use std::sync::{
-    Arc,
-    atomic::Ordering,
-};
+use std::sync::{Arc, atomic::Ordering};
 
 pub const MAX_NETWORK_CODE_LEN: usize = 32;
 pub const MAX_DEVICE_ID_LEN: usize = 64;
@@ -531,6 +528,7 @@ impl FromStr for DeviceMode {
 
 #[derive(Debug, Clone, Default)]
 pub struct Config {
+    pub bandwidth_mode: crate::bandwidth::BandwidthMode,
     pub server_addr: Vec<ProtocolAddress>,
     pub peer_address: Vec<PeerAddress>,
     pub turn: Vec<TurnRule>,

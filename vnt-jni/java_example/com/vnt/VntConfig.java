@@ -38,6 +38,7 @@ public class VntConfig {
     private final boolean fec;
     private final boolean noNat;
     private final String deviceMode;
+    private final String bandwidthMode;
     private final Integer mtu;
     private final boolean allowMapping;
     private final List<String> portMapping;
@@ -73,6 +74,7 @@ public class VntConfig {
         this.fec = builder.fec;
         this.noNat = builder.noNat;
         this.deviceMode = builder.deviceMode;
+        this.bandwidthMode = builder.bandwidthMode;
         this.mtu = builder.mtu;
         this.allowMapping = builder.allowMapping;
         this.portMapping = builder.portMapping;
@@ -143,6 +145,7 @@ public class VntConfig {
         json.put("fec", fec);
         json.put("no_nat", noNat);
         json.put("device_mode", deviceMode);
+        json.put("bandwidth_mode", bandwidthMode);
         json.put("allow_mapping", allowMapping);
         json.put("auto_sync_subnet", autoSyncSubnet);
 
@@ -210,6 +213,7 @@ public class VntConfig {
         private boolean fec = false;
         private boolean noNat = false;
         private String deviceMode = "tun";
+        private String bandwidthMode = "off";
         private Integer mtu;
         private boolean allowMapping = false;
         private List<String> portMapping = new ArrayList<>();
@@ -434,8 +438,17 @@ public class VntConfig {
         }
 
         /**
-         * 设置虚拟网卡模式：no、tun（默认）或 tap。
+         * 设置带宽感知模式：off（默认）、observe 或 auto。
          */
+        public Builder setBandwidthMode(String mode) {
+            if (!"off".equals(mode) && !"observe".equals(mode) && !"auto".equals(mode)) {
+                throw new IllegalArgumentException("bandwidthMode must be off, observe, or auto");
+            }
+            this.bandwidthMode = mode;
+            return this;
+        }
+
+        /** 设置虚拟网卡模式：no、tun（默认）或 tap。 */
         public Builder setDeviceMode(String deviceMode) {
             if (!"no".equals(deviceMode) && !"tun".equals(deviceMode) && !"tap".equals(deviceMode)) {
                 throw new IllegalArgumentException("deviceMode must be no, tun, or tap");

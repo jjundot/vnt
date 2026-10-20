@@ -3,3 +3,5 @@ pub(crate) mod inbound;
 pub(crate) mod outbound;
 pub(crate) mod rpc;
 pub mod transport;
+
+pub(crate) mod bandwidth;

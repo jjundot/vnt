@@ -18,6 +18,7 @@ pub mod tunnel_core;
 pub mod utils;
 
 pub mod api;
+pub mod bandwidth;
 pub(crate) mod enhanced_tunnel;
 pub mod port_mapping;
 pub(crate) mod runtime_config;

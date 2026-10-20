@@ -499,6 +499,8 @@ pub struct StartConfig {
     pub tunnel_port: Option<u16>,
     #[serde(default)]
     pub event_script: Option<String>,
+    #[serde(default)]
+    pub bandwidth_mode: vnt_core::bandwidth::BandwidthMode,
 }
 
 impl StartConfig {
@@ -2585,6 +2587,7 @@ fn convert_config(cfg: StartConfig) -> anyhow::Result<CoreConfig> {
         tunnel_addr: cfg.tunnel_addr,
         tunnel_port: cfg.tunnel_port,
         event_script: cfg.event_script,
+        bandwidth_mode: cfg.bandwidth_mode,
         managed: None,
     })
 }
@@ -3120,6 +3123,7 @@ config_name = "local-label"
             tunnel_addr: Vec::new(),
             tunnel_port: None,
             event_script: None,
+            bandwidth_mode: Default::default(),
         }
     }
 

@@ -1384,6 +1384,8 @@ fn parse_config_from_json(json_str: &str, managed: bool) -> anyhow::Result<Confi
         tunnel_port: Option<u16>,
         #[serde(default)]
         event_script: Option<String>,
+        #[serde(default)]
+        bandwidth_mode: vnt_core::bandwidth::BandwidthMode,
     }
 
     let cfg: ConfigJson = serde_json::from_str(json_str)?;
@@ -1510,6 +1512,7 @@ fn parse_config_from_json(json_str: &str, managed: bool) -> anyhow::Result<Confi
         tunnel_addr: cfg.tunnel_addr,
         tunnel_port: cfg.tunnel_port,
         event_script: cfg.event_script,
+        bandwidth_mode: cfg.bandwidth_mode,
         managed: None,
     };
     // 托管实例的身份只来自订阅信封（RuntimeChangeManager 合并时以信封为准），

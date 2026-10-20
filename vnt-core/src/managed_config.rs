@@ -496,6 +496,7 @@ fn parse_envelope_config(update: &SubscriptionConfigEnvelope) -> EnvelopeConfig 
     });
     let present: HashSet<String> = table.keys().cloned().collect();
     let config = Config {
+        bandwidth_mode: parse_typed(&table, "bandwidth_mode").unwrap_or_default(),
         network_code: update.network_code.clone(),
         device_id: update.device_id.clone(),
         device_name: update.managed_device_name.clone(),

@@ -220,6 +220,47 @@ impl ServerRPC {
             list: map.into_values().collect(),
         })
     }
+    pub(crate) async fn bandwidth(
+        &self,
+        server_id: u32,
+        request: crate::bandwidth::Request,
+    ) -> anyhow::Result<crate::bandwidth::Response> {
+        let state = self.state.load_full();
+        let notifier = state
+            .rpc_notifier
+            .get(&server_id)
+            .ok_or_else(|| anyhow::anyhow!("server unavailable"))?;
+        let waiter = notifier.create_request_and_waiter();
+        let request = RpcMessageRequest {
+            id: waiter.id,
+            rpc_req_payload: Some(RpcReqPayload::BandwidthReq(
+                crate::protocol::rpc_message::BandwidthRequest {
+                    json: serde_json::to_vec(&request)?,
+                },
+            )),
+        };
+        let payload = request.encode_to_vec();
+        let mut packet = NetPacket::new(TransmissionBytes::zeroed(HEAD_LENGTH + payload.len()))?;
+        packet.set_msg_type(MsgType::RpcReq);
+        packet.set_gateway_flag(true);
+        packet.set_ttl(1);
+        packet.set_payload(&payload)?;
+        self.tunnel_to_server
+            .send_to_gateway_expired(server_id, packet, Duration::from_secs(1))
+            .await?;
+        let response = waiter.wait_for_response(Duration::from_secs(3)).await?;
+        let Some(RpcResPayload::BandwidthRes(response)) = response.rpc_res_payload else {
+            bail!("unsupported bandwidth protocol")
+        };
+        anyhow::ensure!(response.json.len() <= 16384, "bandwidth response too large");
+        let response: crate::bandwidth::Response = serde_json::from_slice(&response.json)?;
+        anyhow::ensure!(
+            response.status.version == crate::bandwidth::VERSION,
+            "unsupported bandwidth version"
+        );
+        Ok(response)
+    }
+
     pub async fn client_list_target(&self, server_id: u32) -> anyhow::Result<ClientListResponse> {
         let state = self.state.load_full();
         let Some(rpc_notifier) = state.rpc_notifier.get(&server_id) else {

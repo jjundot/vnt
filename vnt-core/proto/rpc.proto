@@ -12,6 +12,7 @@ message RpcMessageRequest{
   uint64 id = 1;
   oneof rpc_req_payload{
     ClientListRequest client_list_req = 2;
+    BandwidthRequest bandwidth_req = 3;
   }
 }
 
@@ -25,6 +26,7 @@ message RpcMessageResponse{
   uint64 id = 1;
   oneof rpc_res_payload{
     ClientListResponse client_list_res = 2;
+    BandwidthResponse bandwidth_res = 3;
   }
 }
 
@@ -42,3 +44,7 @@ message ClientInfo{
 message ClientListResponse{
   repeated ClientInfo list = 1;
 }
+
+// Versioned JSON envelope; unknown RPC tags remain compatible with old peers.
+message BandwidthRequest { bytes json = 1; }
+message BandwidthResponse { bytes json = 1; }

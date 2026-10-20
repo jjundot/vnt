@@ -248,6 +248,16 @@ impl NetworkManager {
         app_state
             .server_info_collection
             .update_server(server_addresses(&config));
+        app_state.server_info_collection.enable_bandwidth_binding(
+            config.bandwidth_mode == crate::bandwidth::BandwidthMode::Auto,
+        );
+        if config.bandwidth_mode != crate::bandwidth::BandwidthMode::Off {
+            task_group.spawn(crate::tunnel_core::server::bandwidth::run(
+                server_rpc.clone(),
+                app_state.server_info_collection.clone(),
+                config.bandwidth_mode,
+            ));
+        }
         let server_task_group = task_group.child_scope();
         let device_io_manager = DeviceIOManager::new(task_group.clone());
         let ip_update = IpUpdateContext::new(tunnel_to_server.clone());

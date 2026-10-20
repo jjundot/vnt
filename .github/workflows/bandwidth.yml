@@ -1,0 +1,104 @@
+name: Bandwidth builds and tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/bandwidth-aware-migration]
+  pull_request:
+    paths: ['vnt-core/**', 'vnt-ipc/**', 'vnt-jni/**', 'vnt-web/**', 'src/**', '.github/workflows/bandwidth.yml']
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            suffix: ''
+          - os: windows-latest
+            suffix: '.exe'
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile && pnpm build:web
+      - name: Test client crates
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: sudo -E
+        run: cargo test --locked -p vnt-core -p vnt-ipc -p vnt-web -p vnt-jni -p vnt2 --features vnt-ipc,vnt-web --lib --bins
+      - run: cargo clippy --locked -p vnt-core -p vnt-ipc -p vnt-web -p vnt-jni -p vnt2 --features vnt-ipc,vnt-web --lib --bins -- -D warnings
+      - run: cargo build --locked --release -p vnt2 --features vnt-ipc,vnt-web --bins
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bandwidth-client-${{ matrix.os }}
+          path: |
+            target/release/vnt2_cli${{ matrix.suffix }}
+            target/release/vnt2_ctrl${{ matrix.suffix }}
+            target/release/vnt2_web${{ matrix.suffix }}
+            docs/bandwidth.md
+          if-no-files-found: error
+  android:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            abi: arm64-v8a
+            clang: aarch64-linux-android24-clang
+            env: AARCH64_LINUX_ANDROID
+            cc: CC_aarch64_linux_android
+            ar: AR_aarch64_linux_android
+          - target: armv7-linux-androideabi
+            abi: armeabi-v7a
+            clang: armv7a-linux-androideabi24-clang
+            env: ARMV7_LINUX_ANDROIDEABI
+            cc: CC_armv7_linux_androideabi
+            ar: AR_armv7_linux_androideabi
+          - target: x86_64-linux-android
+            abi: x86_64
+            clang: x86_64-linux-android24-clang
+            env: X86_64_LINUX_ANDROID
+            cc: CC_x86_64_linux_android
+            ar: AR_x86_64_linux_android
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager 'ndk;27.3.13750724'
+      - name: Build JNI
+        env:
+          TARGET: ${{ matrix.target }}
+          CLANG: ${{ matrix.clang }}
+          TARGET_ENV: ${{ matrix.env }}
+          CC_ENV: ${{ matrix.cc }}
+          AR_ENV: ${{ matrix.ar }}
+        run: |
+          set -euo pipefail
+          toolchain="$ANDROID_SDK_ROOT/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export "CARGO_TARGET_${TARGET_ENV}_LINKER=$toolchain/$CLANG"
+          export "CARGO_TARGET_${TARGET_ENV}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384"
+          export "$CC_ENV=$toolchain/$CLANG"
+          export "$AR_ENV=$toolchain/llvm-ar"
+          cargo build --locked --release -p vnt-jni --target "$TARGET"
+          mkdir -p jniLibs/${{ matrix.abi }}
+          cp target/$TARGET/release/libvnt_jni.so jniLibs/${{ matrix.abi }}/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bandwidth-android-${{ matrix.abi }}
+          path: jniLibs/
+          if-no-files-found: error

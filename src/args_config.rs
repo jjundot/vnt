@@ -13,6 +13,7 @@ use vnt_ipc::port_mapping::PortMapping;
 
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct FileConfig {
+    pub bandwidth_mode: Option<vnt_core::bandwidth::BandwidthMode>,
     /// 服务端签发的配置源；启动时先拉取远端配置，本文件中的字段覆盖远端值。
     pub subscription: Option<String>,
     pub server: Option<Vec<String>>,
@@ -76,6 +77,7 @@ impl FileConfig {
             };
         }
         overlay!(
+            bandwidth_mode,
             subscription,
             server,
             peer_address,
@@ -443,6 +445,7 @@ fn build_from_args_and_file(args: Args, file: FileConfig) -> anyhow::Result<(Con
         tunnel_addr,
         tunnel_port,
         event_script: args.event_script.or_else(|| file.event_script.clone()),
+        bandwidth_mode: file.bandwidth_mode.unwrap_or_default(),
         managed: None,
     };
 
@@ -576,6 +579,7 @@ fn build_from_file_only(file: FileConfig) -> anyhow::Result<(Config, CtrlConfig)
         tunnel_addr,
         tunnel_port,
         event_script: file.event_script.clone(),
+        bandwidth_mode: file.bandwidth_mode.unwrap_or_default(),
         managed: None,
     };
     let ctrl_config = CtrlConfig {

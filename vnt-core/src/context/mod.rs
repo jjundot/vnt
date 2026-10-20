@@ -439,8 +439,12 @@ impl PeerInfoMap {
     }
 }
 
+type IngressBinding = (u32, Vec<u8>);
+
 #[derive(Clone, Default)]
 pub(crate) struct ServerInfoCollection {
+    bandwidth_ingress: Arc<Mutex<Option<IngressBinding>>>,
+    bandwidth_pin_enabled: Arc<std::sync::atomic::AtomicBool>,
     client_simple_list: Arc<RwLock<Vec<ClientSimpleInfo>>>,
     server_node_map: Arc<RwLock<HashMap<u32, ServerNodeInfo>>>,
 }
@@ -545,7 +549,43 @@ impl ServerInfoCollection {
             })
             .collect::<Vec<_>>();
         servers.sort_unstable_by_key(|(id, rtt)| (*rtt, *id));
+        let mut binding = self.bandwidth_ingress.lock();
+        if let Some((id, instance)) = binding.as_ref() {
+            let healthy = map
+                .get(id)
+                .is_some_and(|server| server.connected && &server.server_instance_id == instance);
+            if healthy && servers.iter().any(|(candidate, _)| candidate == id) {
+                return vec![*id];
+            }
+            if !healthy {
+                *binding = None;
+            }
+        }
+        if binding.is_none()
+            && self
+                .bandwidth_pin_enabled
+                .load(std::sync::atomic::Ordering::Relaxed)
+            && let Some((id, _)) = servers.first()
+            && let Some(node) = map.get(id)
+            && node.server_instance_id.len() == 32
+        {
+            *binding = Some((*id, node.server_instance_id.clone()));
+            return vec![*id];
+        }
         servers.into_iter().map(|(id, _)| id).collect()
+    }
+    pub(crate) fn enable_bandwidth_binding(&self, enabled: bool) {
+        self.bandwidth_pin_enabled
+            .store(enabled, std::sync::atomic::Ordering::Relaxed);
+    }
+    pub(crate) fn bandwidth_bound_ingress(&self) -> Option<u32> {
+        self.bandwidth_ingress.lock().as_ref().map(|(id, _)| *id)
+    }
+    pub(crate) fn bind_bandwidth_ingress(&self, server_id: u32, instance: Vec<u8>) {
+        *self.bandwidth_ingress.lock() = Some((server_id, instance));
+    }
+    pub(crate) fn clear_bandwidth_ingress(&self) {
+        *self.bandwidth_ingress.lock() = None;
     }
     pub fn client_online_ips(&self) -> Vec<Ipv4Addr> {
         self.client_simple_list
@@ -849,6 +889,50 @@ fn ipv4_nets_overlap(left: Ipv4Net, right: Ipv4Net) -> bool {
 mod server_identity_tests {
     use super::ServerInfoCollection;
     use crate::tunnel_core::server::transport::config::ProtocolAddress;
+
+    #[test]
+    fn bandwidth_binding_ignores_rtt_but_allows_fault_and_restart_fallback() {
+        use crate::protocol::control_message::{ClientSimpleInfo, ClientType};
+        use std::net::Ipv4Addr;
+        let servers = ServerInfoCollection::default();
+        let peer = Ipv4Addr::new(10, 26, 0, 2);
+        servers.update_server(vec![
+            (0, ProtocolAddress::default()),
+            (1, ProtocolAddress::default()),
+        ]);
+        for id in [0, 1] {
+            servers.set_server_connected(id, true);
+            servers.set_server_identity(id, vec![id as u8; 32], true);
+            servers
+                .server_node_map
+                .write()
+                .get_mut(&id)
+                .unwrap()
+                .client_map
+                .insert(
+                    peer,
+                    ClientSimpleInfo {
+                        ip: peer,
+                        online: true,
+                        client_type: ClientType::Vnt,
+                    },
+                );
+        }
+        servers.set_server_rtt(0, 1);
+        servers.set_server_rtt(1, 100);
+        servers.enable_bandwidth_binding(true);
+        servers.set_server_rtt(0, 200);
+        assert_eq!(servers.servers_for_ip_by_latency(&[0, 1], &peer), vec![1]);
+        servers.set_server_rtt(0, 1);
+        assert_eq!(servers.servers_for_ip_by_latency(&[0, 1], &peer), vec![1]);
+        servers.bind_bandwidth_ingress(1, vec![1; 32]);
+        assert_eq!(servers.servers_for_ip_by_latency(&[0, 1], &peer), vec![1]);
+        servers.set_server_connected(1, false);
+        assert_eq!(servers.servers_for_ip_by_latency(&[0, 1], &peer), vec![0]);
+        servers.set_server_connected(1, true);
+        servers.set_server_identity(1, vec![9; 32], true);
+        assert_eq!(servers.servers_for_ip_by_latency(&[0, 1], &peer)[0], 0);
+    }
 
     #[test]
     fn grouping_requires_both_instance_id_and_multi_link_capability() {

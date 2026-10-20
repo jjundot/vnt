@@ -155,3 +155,7 @@ vnt2.0 整体重构了一遍，和 1.0 不兼容，欢迎反馈。
 4. 打洞通道处理（https://github.com/rustp2p/rustp2p/tree/master/rustp2p-core）
 5. VNT安卓端2.0已发布（https://github.com/vnt-dev/VntApp）
 6. VNT服务端（https://github.com/vnt-dev/vnts）
+
+## 带宽感知实验分支
+
+配置、行为和验证边界见 [带宽感知迁移](docs/bandwidth.md)。默认关闭自动迁移。
